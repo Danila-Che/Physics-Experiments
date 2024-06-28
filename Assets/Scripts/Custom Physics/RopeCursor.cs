@@ -1,32 +1,15 @@
 using CustomPhysics;
 using UnityEngine;
 
-[RequireComponent(typeof(Rope))]
-public class RopeCursor : MonoBehaviour, IRopeDirection
+public class RopeCursor : MonoBehaviour
 {
-    [SerializeField] private AttachmentParticle m_AttachmentParticle;
+    [SerializeField] private ParticleAttachment m_ParticleAttachment;
 
-    private Rope m_Rope;
-
-    public AttachmentParticle StartRopeFrom => m_AttachmentParticle switch
-    {
-        AttachmentParticle.Top => AttachmentParticle.Bottom,
-        AttachmentParticle.Bottom => AttachmentParticle.Top,
-        _ => throw new System.NotImplementedException(),
-    };
+    public ParticleAttachment ParticleAttachment => m_ParticleAttachment;
 
 #if UNITY_INCLUDE_TESTS && UNITY_EDITOR
 
-    public AttachmentParticle Test_AttachmentParticle { get => m_AttachmentParticle; set => m_AttachmentParticle = value; }
-    public Rope Test_Rope { get => m_Rope; set => m_Rope = value; }
-
-
-    public void OnStart() => Start();
+	public ParticleAttachment Test_ParticleAttachment { get => m_ParticleAttachment; set => m_ParticleAttachment = value; }
 
 #endif
-
-    private void Start()
-    {
-        m_Rope = GetComponent<Rope>();
-    }
 }

@@ -8,7 +8,7 @@ namespace CustomPhysics
         JobHandle Job { get; set; }
         NativeList<Particle> Particles { get; }
         NativeList<DistanceConstraint> DistanceConstraints { get; }
-        NativeList<AttachmentConstraint> AttachmentConstraints { get; }
+		NativeArray<AttachmentConstraint> AttachmentConstraints { get; }
 
         void UpdateContainer();
     }
