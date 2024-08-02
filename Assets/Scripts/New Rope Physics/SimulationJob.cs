@@ -7,6 +7,8 @@ namespace RopePhysics
 {
 	/// <summary>
 	/// Used algorithm: https://en.wikipedia.org/wiki/Verlet_integration
+	/// https://www.cs.toronto.edu/~jacobson/seminar/mueller-et-al-2007.pdf
+	/// https://matthias-research.github.io/pages/publications/PBDBodies.pdf
 	/// </summary>
 	[BurstCompile]
 	internal struct SimulationJob : IJob
@@ -19,6 +21,11 @@ namespace RopePhysics
 		{
 			for (int i = 0; i < Particles.Length; i++)
 			{
+				if (Particles[i].InverseMass == 0.0f)
+				{
+					continue;
+				}
+
 				if (Particles[i].IsSleep)
 				{
 					ExecuteFirstStep(i);
