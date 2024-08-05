@@ -19,7 +19,7 @@ namespace RopePhysics
 		public void InitWithSolver(Solver solver)
 		{
 			m_Rigidbody = GetComponent<Rigidbody>();
-			m_Point = new Point(m_Attachment, m_Rigidbody.position);
+			m_Point = new Point(m_Attachment, m_Rigidbody.position, m_Mass);
 
 			solver.Register(m_Point);
 		}
@@ -31,7 +31,7 @@ namespace RopePhysics
 
 		public void Dispose()
 		{
-			((IDisposable)m_Point).Dispose();
+			m_Point?.Dispose();
 		}
 
 		public void ActualiaseFromSolver(Solver solver)

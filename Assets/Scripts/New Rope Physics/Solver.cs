@@ -68,9 +68,7 @@ namespace RopePhysics
 			m_Actors = new List<IActor>();
 		}
 
-		public Solver(float3 gravity, int distanceConstraintsIterations, bool needDistanceConstraint)
-		{
-		}
+		public Solver(float3 gravity, int distanceConstraintsIterations, bool needDistanceConstraint) { }
 
 		public List<Rope> Ropes => m_Ropes;
 
@@ -124,12 +122,15 @@ namespace RopePhysics
 				DeltaTime = substepTimeInSeconds,
 			}.Schedule(m_JobHandle);
 
-			m_JobHandle = new DistanceConstraintJob
+			if (m_NeedDistanceConstraint)
 			{
-				Particles = m_Particles,
-				DistanceConstraints = m_Constraints,
-				DistanceConstraintsIterations = m_DistanceConstraintsIterations,
-			}.Schedule(m_JobHandle);
+				m_JobHandle = new DistanceConstraintJob
+				{
+					Particles = m_Particles,
+					DistanceConstraints = m_Constraints,
+					DistanceConstraintsIterations = m_DistanceConstraintsIterations,
+				}.Schedule(m_JobHandle);
+			}
 
 			//m_Ropes.ForEach(rope => Step(rope, substepTimeInSeconds));
 		}
@@ -218,6 +219,7 @@ namespace RopePhysics
 						out Vector3 direction,
 						out float distance);
 
+					particle.OldPosition = particle.Position;
 					particle.Position += (float3)direction * distance;
 				}
 

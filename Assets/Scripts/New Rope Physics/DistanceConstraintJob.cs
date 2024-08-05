@@ -21,7 +21,7 @@ namespace RopePhysics
 
 		public void Execute()
 		{
-			for (int iteration = 0; iteration < DistanceConstraintsIterations && iteration < DistanceConstraints.Length - 1; iteration++)
+			for (int iteration = 0; iteration < DistanceConstraintsIterations; iteration++)
 			{
 				for (int i = 0; i < DistanceConstraints.Length; i++)
 				{
