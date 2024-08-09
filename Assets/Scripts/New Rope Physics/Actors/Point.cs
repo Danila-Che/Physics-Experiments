@@ -77,6 +77,11 @@ namespace RopePhysics
 			var particles = solver.Particles;
 			var particle = particles[m_Offset];
 
+			if (math.all(particle.Position == position) is false)
+			{
+				particle.OldPosition = particle.Position;
+			}
+
 			particle.Position = position;
 
 			particles[m_Offset] = particle;

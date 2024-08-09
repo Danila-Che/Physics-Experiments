@@ -7,11 +7,16 @@ namespace RopePhysics
 	public class Rope : IActor
 	{
 		private readonly float m_SpanDistance;
-		private int m_ParticleCount;
+		private readonly float m_MassOfParticle;
 		private int m_StartIndexOfParticles;
 		private NativeArray<DistanceConstraint> m_DistanceConstraints;
 		private NativeArray<Particle> m_Particles;
 		private NativeArray<Particle> m_ParitclesCopy;
+
+		private int m_EdgeParticle0Index;
+		private int m_EdgeParticle1Index;
+		private Particle m_EdgeParticle0;
+		private Particle m_EdgeParticle1;
 
 		private AttachmentConstraint m_TargetParticleAttachmentConstraint;
 		private AttachmentConstraint m_SourceParticleAttachmentConstraint;
@@ -21,7 +26,9 @@ namespace RopePhysics
 
 		private JobHandle m_Job;
 
-		public Rope() : this(1.0f) { }
+		public Rope() : this(spanDistance: 1.0f, massOfParticle: 1.0f) { }
+
+		public Rope(float spanDistance) : this(spanDistance, massOfParticle: 1.0f) { }
 
 		public Rope(float spanDistance, AttachmentConstraintAlias targetAttachmentConstraint, AttachmentConstraintAlias sourceAttachmentConstraint)
 		{
@@ -29,27 +36,10 @@ namespace RopePhysics
 			m_SourceParticleAttachmentConstraint = new AttachmentConstraint(isExists: false);
 		}
 
-		public Rope(
-			float spanDistance,
-			IAttachmentConstraintController targetAttachmentConstraintController,
-			IAttachmentConstraintController sourceAttachmentConstraintController)
-			: this(spanDistance)
-		{
-			m_TargetAttachmentConstraintController = targetAttachmentConstraintController;
-			m_SourceAttachmentConstraintController = sourceAttachmentConstraintController;
-
-			m_TargetParticleAttachmentConstraint = new AttachmentConstraint(
-				targetAttachmentConstraintController.Attachment,
-				isExists: true);
-
-			m_SourceParticleAttachmentConstraint = new AttachmentConstraint(
-				sourceAttachmentConstraintController.Attachment,
-				isExists: true);
-		}
-
-		public Rope(float spanDistance)
+		public Rope(float spanDistance, float massOfParticle)
 		{
 			m_SpanDistance = spanDistance;
+			m_MassOfParticle = massOfParticle;
 		}
 
 		public NativeArray<Particle> Particles => m_Particles;
@@ -62,12 +52,11 @@ namespace RopePhysics
 
 		public AttachmentConstraint SourceParticleAttachmentConstraint => m_SourceParticleAttachmentConstraint;
 
-		public bool HasAttachment => m_TargetParticleAttachmentConstraint.IsExists && m_SourceParticleAttachmentConstraint.IsExists;
-		public bool AllAttachmentIsStatic =>
-			m_TargetParticleAttachmentConstraint.Attachment is Attachment.Static
-			&& m_SourceParticleAttachmentConstraint.Attachment is Attachment.Static;
-
 		public JobHandle Job { get => m_Job; set => m_Job = value; }
+
+		public float3 EdgeParticle0Position => m_EdgeParticle0.Position;
+
+		public float3 EdgeParticle1Position => m_EdgeParticle1.Position;
 
 		public void Dispose()
 		{
@@ -98,15 +87,6 @@ namespace RopePhysics
 			m_SourceParticleAttachmentConstraint.Position = m_SourceAttachmentConstraintController.Position;
 		}
 
-		public void UpdatePositions()
-		{
-			m_TargetParticleAttachmentConstraint.Position = Particles[0].Position;
-			m_SourceParticleAttachmentConstraint.Position = Particles[^1].Position;
-
-			m_TargetAttachmentConstraintController.Resolve(ref m_TargetParticleAttachmentConstraint);
-			m_SourceAttachmentConstraintController.Resolve(ref m_SourceParticleAttachmentConstraint);
-		}
-
 		public void CreateRope()
 		{
 			CreateRope(m_SourceAttachmentConstraintController.Position, m_TargetAttachmentConstraintController.Position);
@@ -114,6 +94,9 @@ namespace RopePhysics
 
 		public void CreateRope(Solver solver, int startParticleIndex, int finishParticleIndex)
 		{
+			m_EdgeParticle0Index = finishParticleIndex;
+			m_EdgeParticle1Index = startParticleIndex;
+
 			var source = solver.Particles[startParticleIndex].Position;
 			var target = solver.Particles[finishParticleIndex].Position;
 
@@ -122,15 +105,13 @@ namespace RopePhysics
 			var magnitude = math.length(vector);
 			var particleCount = 1 + (int)math.ceil(magnitude / m_SpanDistance) - 2;
 
-			m_ParticleCount = particleCount;
-
 			m_Particles = new NativeArray<Particle>(particleCount, Allocator.Persistent);
-			m_ParitclesCopy = new NativeArray<Particle>(particleCount, Allocator.Persistent);
+			m_ParitclesCopy = new NativeArray<Particle>(particleCount + 2, Allocator.Persistent);
 			m_DistanceConstraints = new NativeArray<DistanceConstraint>(particleCount + 1, Allocator.Persistent);
 
 			for (int i = 0; i < m_Particles.Length; i++)
 			{
-				m_Particles[i] = new Particle(target + m_SpanDistance * (i + 1) * normal, mass: 1.0f);
+				m_Particles[i] = new Particle(target + m_SpanDistance * (i + 1) * normal, m_MassOfParticle);
 			}
 
 			var offset = solver.NextParticleId;
@@ -148,35 +129,10 @@ namespace RopePhysics
 		{
 			var distance = math.distance(fromPositoin, toPosition);
 
-			UnityEngine.Debug.Log($"> {i} {from} {to} {distance}");
-
 			m_DistanceConstraints[i] = new DistanceConstraint(distance, from, to);
 		}
 
-		public void CreateRope(float3 source, float3 target)
-		{
-			//var vector = source - target;
-			//var normal = math.normalize(vector);
-			//var magnitude = math.length(vector);
-			//var particleCount = 1 + (int)math.ceil(magnitude / m_SpanDistance);
-
-			//m_Particles.SetCapacity(particleCount);
-			//m_DistanceConstraints.SetCapacity(particleCount - 1);
-
-			//for (int i = 0; i < particleCount - 1; i++)
-			//{
-			//	m_Particles.AddNoResize(new Particle(target + m_SpanDistance * i * normal, mass: 1.0f));
-			//}
-
-			//m_Particles.AddNoResize(new Particle(source, mass: 1.0f));
-
-			//for (int i = 0; i < particleCount - 1; i++)
-			//{
-			//	var distance = math.distance(m_Particles[i].Position, m_Particles[i + 1].Position);
-
-			//	m_DistanceConstraints.AddNoResize(new DistanceConstraint(distance));
-			//}
-		}
+		public void CreateRope(float3 source, float3 target) { }
 
 		public void Notify(int startIndexOfParticles, int startIndexOfConstraint)
 		{
@@ -185,12 +141,17 @@ namespace RopePhysics
 
 		public void UpdateWith(Solver solver)
 		{
-			UnityEngine.Debug.Log($"> {m_StartIndexOfParticles}");
+			m_EdgeParticle0 = solver.Particles[m_EdgeParticle0Index];
+			m_EdgeParticle1 = solver.Particles[m_EdgeParticle1Index];
 
-			for (int i = 0; i < m_ParitclesCopy.Length; i++)
+			m_ParitclesCopy[0] = m_EdgeParticle0;
+
+			for (int i = 0; i < m_ParitclesCopy.Length - 2; i++)
 			{
-				m_ParitclesCopy[i] = solver.Particles[m_StartIndexOfParticles + i];
+				m_ParitclesCopy[1 + i] = solver.Particles[m_StartIndexOfParticles + i];
 			}
+
+			m_ParitclesCopy[^1] = m_EdgeParticle1;
 		}
 
 		public void UpdateWith(NativeList<Particle> particles, NativeList<DistanceConstraint> distanceConstraints)

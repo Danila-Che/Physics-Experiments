@@ -66,5 +66,10 @@ namespace RopePhysics
 		{
 			m_BoxCollider?.Dispose();
 		}
+
+		public int GetParticleIndex(int innerIndex)
+		{
+			return m_BoxCollider.StartIndexOfParticles + innerIndex;
+		}
 	}
 }

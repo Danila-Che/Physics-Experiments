@@ -86,7 +86,7 @@ namespace RopePhysics
 			var vector = to - from;
 			var normal = vector.normalized;
 			var length = vector.magnitude;
-			var count = (int)(Mathf.Floor(length / m_Offset));
+			var count = (int)(Mathf.Ceil(length / m_Offset));
 
 			var trs = Matrix4x4.identity;
 			var lookRotation = Quaternion.LookRotation(normal) * Quaternion.Euler(m_Rotation);
@@ -107,7 +107,6 @@ namespace RopePhysics
 			}
 
 			m_Error = (length - count * m_Offset) * normal;
-
 			m_ParityBit ^= count & 1;
 		}
 

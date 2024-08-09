@@ -1,20 +1,22 @@
-using System;
 using UnityEngine;
 
 namespace RopePhysics
 {
 	[RequireComponent(typeof(Rigidbody))]
 	[RequireComponent(typeof(Collider))]
-    public class RigidbodyPointController : MonoBehaviour, IPrimaryActorController
+	[SelectionBase]
+	public class RigidbodyPointController : MonoBehaviour, IPrimaryActorController
 	{
 		[SerializeField] private Attachment m_Attachment;
-		[Min(0.0f)]
+		[Min(0.01f)]
 		[SerializeField] private float m_Mass;
 
 		private Point m_Point;
 		private Rigidbody m_Rigidbody;
 
 		public int Id => m_Point.Offset;
+
+		public Vector3 Position => transform.position;
 
 		public void InitWithSolver(Solver solver)
 		{

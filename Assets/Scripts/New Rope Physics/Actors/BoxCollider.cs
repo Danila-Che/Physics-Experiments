@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Mathematics;
 
@@ -49,21 +50,50 @@ namespace RopePhysics
 
 			m_StartIndexOfParticles = startIndexOfParticles;
 
-			UnityEngine.Debug.Log($"> {m_StartIndexOfParticles}");
-
 			int index = 0;
 			for (int i = 0; i < s_NeighborIndices.GetLength(0); i++)
 			{
 				int index0 = s_NeighborIndices[i, 0];
 				int index1 = s_NeighborIndices[i, 1];
 				var distance = math.distance(m_Particles[index0].Position, m_Particles[index1].Position);
+
 				m_Constraints[index++] = new DistanceConstraint(distance, m_StartIndexOfParticles + index0, m_StartIndexOfParticles + index1);
 			}
 
 			for (int i = 0; i < 4; i++)
 			{
 				var distance = math.distance(m_Particles[i].Position, m_Particles[7 - i].Position);
+
 				m_Constraints[index++] = new DistanceConstraint(distance, m_StartIndexOfParticles + i, m_StartIndexOfParticles + 7 - i);
+			}
+		}
+
+		public BoxCollider(int startIndexOfParticles, List<float3> vertices, List<(int vertex0, int vertex1)> connection)
+		{
+			m_StartIndexOfParticles = startIndexOfParticles;
+
+			m_Particles = new NativeArray<Particle>(vertices.Count, Allocator.Persistent);
+			m_ParticlesCopy = new NativeArray<Particle>(m_Particles.Length, Allocator.Persistent);
+			m_Constraints = new NativeArray<DistanceConstraint>(connection.Count, Allocator.Persistent);
+
+			for (int i = 0; i < vertices.Count; i++)
+			{
+				m_Particles[i] = new Particle(vertices[i], mass: 1.0f);
+			}
+
+			m_ParticlesCopy.CopyFrom(m_Particles);
+
+			for (int i = 0; i < connection.Count; i++)
+			{
+				int index0 = connection[i].vertex0;
+				int index1 = connection[i].vertex1;
+
+				var distance = math.distance(m_Particles[index0].Position, m_Particles[index1].Position);
+
+				m_Constraints[i] = new DistanceConstraint(
+					distance,
+					m_StartIndexOfParticles + index0,
+					m_StartIndexOfParticles + index1);
 			}
 		}
 
@@ -105,16 +135,18 @@ namespace RopePhysics
 
 		public float3 GetCenter()
 		{
-			var center = float3.zero;
+			//var center = float3.zero;
 
-			for (int i = 0; i < m_ParticlesCopy.Length; i++)
-			{
-				center += m_ParticlesCopy[i].Position;
-			}
+			//for (int i = 0; i < 8; i++)
+			//{
+			//	center += m_ParticlesCopy[i].Position;
+			//}
 
-			center /= m_ParticlesCopy.Length;
+			//center /= m_ParticlesCopy.Length;
 
-			return center;
+			//return center;
+
+			return m_ParticlesCopy[8].Position;
 		}
 
 		public quaternion GetRotation(float3 center)
@@ -122,14 +154,14 @@ namespace RopePhysics
 			var upPoint =
 				  m_ParticlesCopy[2].Position
 				+ m_ParticlesCopy[3].Position
-				+ m_ParticlesCopy[6].Position
-				+ m_ParticlesCopy[7].Position;
+				+ m_ParticlesCopy[4].Position
+				+ m_ParticlesCopy[5].Position;
 			upPoint /= 4;
 			var forwardPoint =
-				  m_ParticlesCopy[4].Position
-				+ m_ParticlesCopy[5].Position
-				+ m_ParticlesCopy[6].Position
-				+ m_ParticlesCopy[7].Position;
+				  m_ParticlesCopy[0].Position
+				+ m_ParticlesCopy[1].Position
+				+ m_ParticlesCopy[2].Position
+				+ m_ParticlesCopy[3].Position;
 			forwardPoint /= 4;
 
 			var upVector = upPoint - center;

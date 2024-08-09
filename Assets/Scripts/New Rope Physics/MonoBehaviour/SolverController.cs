@@ -11,6 +11,7 @@ namespace RopePhysics
 		[SerializeField] private bool m_NeedDistanceConstraint = true;
 		[SerializeField] private bool m_NeedCollisionDetection = true;
 		[SerializeField] private bool m_NeedSimulateUnityPhysics = false;
+		[SerializeField] private bool m_NeedPostProcessing = false;
 		[Min(1)]
 		[SerializeField] private int m_DistanceConstraintsIterations = 1;
 		[Min(0.0f)]
@@ -61,6 +62,8 @@ namespace RopePhysics
 
 		private void OnDisable()
 		{
+			m_Solver.EndStep();
+
 			Physics.simulationMode = m_SimulationMode;
 
 			m_Solver.Dispose();
@@ -76,13 +79,12 @@ namespace RopePhysics
 		{
 			m_Solver.BeginStep();
 			m_Solver.Step(Time.fixedDeltaTime);
+			m_Solver.EndStep();
 
 			if (m_NeedCollisionDetection)
 			{
 				m_Solver.AdjustCollisions();
 			}
-
-			m_Solver.EndStep();
 
 			foreach (var actor in m_ActorController)
 			{
@@ -92,11 +94,19 @@ namespace RopePhysics
 			if (m_NeedSimulateUnityPhysics)
 			{
 				Physics.Simulate(Time.fixedDeltaTime);
+			}
 
+			if (m_NeedPostProcessing)
+			{
 				foreach (var actor in m_ActorController)
 				{
 					actor.ActualiaseToSolver(m_Solver);
 				}
+			}
+
+			if (m_NeedDistanceConstraint)
+			{
+				m_Solver.Constraint();
 			}
 		}
 	}

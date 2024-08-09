@@ -122,17 +122,27 @@ namespace RopePhysics
 				DeltaTime = substepTimeInSeconds,
 			}.Schedule(m_JobHandle);
 
-			if (m_NeedDistanceConstraint)
-			{
-				m_JobHandle = new DistanceConstraintJob
-				{
-					Particles = m_Particles,
-					DistanceConstraints = m_Constraints,
-					DistanceConstraintsIterations = m_DistanceConstraintsIterations,
-				}.Schedule(m_JobHandle);
-			}
+			//if (m_NeedDistanceConstraint)
+			//{
+			//	m_JobHandle = new DistanceConstraintJob
+			//	{
+			//		Particles = m_Particles,
+			//		DistanceConstraints = m_Constraints,
+			//		DistanceConstraintsIterations = m_DistanceConstraintsIterations,
+			//	}.Schedule(m_JobHandle);
+			//}
 
 			//m_Ropes.ForEach(rope => Step(rope, substepTimeInSeconds));
+		}
+
+		public void Constraint()
+		{
+			m_JobHandle = new DistanceConstraintJob
+			{
+				Particles = m_Particles,
+				DistanceConstraints = m_Constraints,
+				DistanceConstraintsIterations = m_DistanceConstraintsIterations,
+			}.Schedule(m_JobHandle);
 		}
 
 		public void EndStep()
