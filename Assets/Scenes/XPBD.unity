@@ -327,7 +327,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 884488357}
-  - component: {fileID: 884488358}
   - component: {fileID: 884488359}
   m_Layer: 0
   m_Name: '[DYNAMIC WORLD]'
@@ -356,24 +355,6 @@ Transform:
   - {fileID: 27863557}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &884488358
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 884488356}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8efb0f7dc26118d4498d305e0351a260, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  m_GravitationalAcceleration:
-    x: 0
-    y: -9.81
-    z: 0
-  m_SubstepIteractionsNumber: 1
-  m_SolvePositionIteractionsNumber: 1
 --- !u!114 &884488359
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1082,7 +1063,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 985946fe20b04074995d98f938bcdfdd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_Mass: 1
 --- !u!1 &2141764372
 GameObject:
   m_ObjectHideFlags: 0

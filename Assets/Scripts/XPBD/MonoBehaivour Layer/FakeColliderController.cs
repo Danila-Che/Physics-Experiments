@@ -1,4 +1,5 @@
 using UnityEngine;
+using XPBD;
 
 namespace FakeXPBDMonoBehaviour
 {
@@ -6,6 +7,8 @@ namespace FakeXPBDMonoBehaviour
 	[RequireComponent(typeof(Collider))]
 	public class FakeColliderController : MonoBehaviour
 	{
+		public BaseFakeCollider Collider => new FakeBoxCollider();
+
 		private void OnEnable()
 		{
 			var collider = GetComponent<Collider>();

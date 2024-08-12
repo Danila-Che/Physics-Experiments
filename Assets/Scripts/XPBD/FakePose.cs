@@ -1,44 +1,45 @@
 using System.Runtime.CompilerServices;
 using Unity.Mathematics;
+using UnityEngine;
 
 namespace XPBD
 {
-	internal readonly struct FakePose
+	public readonly struct FakePose
 	{
+		public static readonly FakePose k_Identity = new(float3.zero, quaternion.identity);
+
 		private readonly float3 m_Position;
-		private readonly quaternion m_Quaternion;
+		private readonly quaternion m_Rotation;
 
 		public FakePose(float3 position, quaternion quaternion)
 		{
 			m_Position = position;
-			m_Quaternion = quaternion;
+			m_Rotation = quaternion;
 		}
 
 		public FakePose(in FakePose pose)
 		{
 			m_Position = pose.m_Position;
-			m_Quaternion = pose.m_Quaternion;
+			m_Rotation = pose.m_Rotation;
 		}
 
-		public static FakePose Default => new(float3.zero, quaternion.identity);
+		public FakePose(Transform transform)
+		{
+			m_Position = transform.position;
+			m_Rotation = transform.rotation;
+		}
 
 		public float3 Position => m_Position;
 
-		public quaternion Quaternion => m_Quaternion;
+		public quaternion Rotation => m_Rotation;
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public FakePose Transform(in FakePose pose)
 		{
 			var position = Transform(pose.m_Position);
-			var quaternion = math.mul(m_Quaternion, pose.m_Quaternion);
+			var quaternion = math.mul(m_Rotation, pose.m_Rotation);
 
 			return new FakePose(position, quaternion);
-		}
-
-		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		public FakePose Clone()
-		{
-			return new FakePose(m_Position, m_Quaternion);
 		}
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -50,7 +51,7 @@ namespace XPBD
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public float3 Rotate(float3 vector)
 		{
-			return math.mul(m_Quaternion, vector);
+			return math.mul(m_Rotation, vector);
 		}
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -62,7 +63,7 @@ namespace XPBD
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public float3 InverseRotate(float3 vector)
 		{
-			var inverse = math.conjugate(m_Quaternion);
+			var inverse = math.inverse(m_Rotation);
 
 			return math.mul(inverse, vector);
 		}
@@ -70,13 +71,13 @@ namespace XPBD
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public FakePose Translate(float3 deltaPosition)
 		{
-			return new FakePose(m_Position + deltaPosition, m_Quaternion);
+			return new FakePose(m_Position + deltaPosition, m_Rotation);
 		}
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public FakePose SetRotation(quaternion rotation)
 		{
-			return new FakePose(m_Position, rotation).Translate(float3.zero);
+			return new FakePose(m_Position, rotation);
 		}
 	}
 }

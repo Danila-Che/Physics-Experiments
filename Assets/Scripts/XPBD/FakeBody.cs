@@ -1,74 +1,75 @@
 using Unity.Mathematics;
-using UnityEngine;
-using UnityEngine.Assertions;
 
 namespace XPBD
 {
-	[RequireComponent(typeof(Collider))]
-	public class FakeBody : MonoBehaviour
+	public class FakeBody
 	{
 		private const float k_MaxRotationPerSubstep = 0.5f;
 
-		[Min(0.01f)]
-		[SerializeField] private float m_Mass = 1.0f;
+		private readonly BaseFakeCollider m_Collider;
 
 		private FakePose m_Pose;
 		private FakePose m_PreviousPose;
-		private FakePose m_OriginPose;
 
 		private float3 m_Velocity;
-		/// <summary>
-		/// Omega
-		/// </summary>
-		private float3 m_AngularVelocity;
+		private float3 m_AngularVelocity; // omega
 
-		private float m_InverseMass;
-		private float3 m_InverseInertiaTensor; // may just inverse inertia
-
-		public void Init()
+		public FakeBody(in FakePose pose, BaseFakeCollider collider)
 		{
-			m_Pose = new FakePose(transform.position, transform.rotation);
-			m_PreviousPose = new FakePose(m_Pose);
-			m_OriginPose = new FakePose(m_Pose);
+			m_Pose = pose;
+			m_PreviousPose = pose;
 			m_Velocity = float3.zero;
 			m_AngularVelocity = float3.zero;
 
-			m_InverseMass = 1.0f;
-			m_InverseInertiaTensor = new float3(1.0f);
+			m_Collider = collider;
 		}
 
-		public void SetBox()
+		public FakePose Pose => m_Pose;
+
+		public BaseFakeCollider Collider => m_Collider;
+
+		public float3 AngularVelocity => m_AngularVelocity;
+
+		// public void SetBox()
+		// {
+		// 	var boxCollider = GetComponent<BoxCollider>();
+
+		// 	Assert.IsNotNull(boxCollider);
+
+		// 	m_InverseMass = math.isfinite(m_Mass) switch
+		// 	{
+		// 		true => 1.0f / m_Mass,
+		// 		false => 0.0f,
+		// 	};
+
+		// 	var size = boxCollider.size;
+		// 	var inertiaTensor = new float3()
+		// 	{
+		// 		x = (m_Mass / 12.0f) * (size.y * size.y + size.z * size.z),
+		// 		y = (m_Mass / 12.0f) * (size.x * size.x + size.z * size.z),
+		// 		z = (m_Mass / 12.0f) * (size.x * size.x + size.y * size.y),
+		// 	};
+
+		// 	m_InverseInertiaTensor = new float3()
+		// 	{
+		// 		x = 1.0f / inertiaTensor.x,
+		// 		y = 1.0f / inertiaTensor.y,
+		// 		z = 1.0f / inertiaTensor.z,
+		// 	};
+		// }
+
+		public void ApplyAcceleration(float deltaTime, float3 acceleration)
 		{
-			var boxCollider = GetComponent<BoxCollider>();
-
-			Assert.IsNotNull(boxCollider);
-
-			m_InverseMass = math.isfinite(m_Mass) switch
-			{
-				true => 1.0f / m_Mass,
-				false => 0.0f,
-			};
-
-			var size = boxCollider.size;
-			var inertiaTensor = new float3()
-			{
-				x = (m_Mass / 12.0f) * (size.y * size.y + size.z * size.z),
-				y = (m_Mass / 12.0f) * (size.x * size.x + size.z * size.z),
-				z = (m_Mass / 12.0f) * (size.x * size.x + size.y * size.y),
-			};
-
-			m_InverseInertiaTensor = new float3()
-			{
-				x = 1.0f / inertiaTensor.x,
-				y = 1.0f / inertiaTensor.y,
-				z = 1.0f / inertiaTensor.z,
-			};
+			m_Velocity += acceleration * deltaTime;
 		}
 
-		public void Step(float deltaTime, float3 acceleration)
+		public void BeginStep()
 		{
 			m_PreviousPose = m_Pose;
-			m_Velocity += acceleration * deltaTime;
+		}
+
+		public void Step(float deltaTime)
+		{
 			m_Pose = m_Pose.Translate(m_Velocity * deltaTime);
 
 			ApplyRotation(m_AngularVelocity, deltaTime);
@@ -78,7 +79,7 @@ namespace XPBD
 		{
 			m_Velocity = (m_Pose.Position - m_PreviousPose.Position) / deltaTime;
 
-			var deltaQuaternion = math.mul(m_Pose.Quaternion, math.conjugate(m_PreviousPose.Quaternion));
+			var deltaQuaternion = math.mul(m_Pose.Rotation, math.inverse(m_PreviousPose.Rotation));
 			m_AngularVelocity = new float3(
 				x: 2.0f * deltaQuaternion.value.x / deltaTime,
 				y: 2.0f * deltaQuaternion.value.y / deltaTime,
@@ -88,14 +89,6 @@ namespace XPBD
 			{
 				m_AngularVelocity = -m_AngularVelocity;
 			}
-		}
-
-		/// <summary>
-		/// Update position and rotation of body in Unity scene
-		/// </summary>
-		public void UpdatePresentation()
-		{
-			transform.SetPositionAndRotation(m_Pose.Position, m_Pose.Quaternion);
 		}
 
 		public float3 GetVelocityAt(float3 position)
@@ -114,13 +107,13 @@ namespace XPBD
 			nVector = m_Pose.InverseRotate(nVector);
 
 			var w =
-				nVector.x * nVector.x * m_InverseInertiaTensor.x +
-				nVector.y * nVector.y * m_InverseInertiaTensor.y +
-				nVector.z * nVector.z * m_InverseInertiaTensor.z;
+				nVector.x * nVector.x * m_Collider.InverseInertiaTensor.x +
+				nVector.y * nVector.y * m_Collider.InverseInertiaTensor.y +
+				nVector.z * nVector.z * m_Collider.InverseInertiaTensor.z;
 
 			if (position != null)
 			{
-				w += m_InverseMass;
+				w += m_Collider.InverseMass;
 			}
 
 			return w;
@@ -137,18 +130,18 @@ namespace XPBD
 			{
 				if (velocityLevel)
 				{
-					m_Velocity += correction * m_InverseMass;
+					m_Velocity += correction * m_Collider.InverseMass;
 				}
 				else
 				{
-					m_Pose = m_Pose.Translate(correction * m_InverseMass);
+					m_Pose = m_Pose.Translate(correction * m_Collider.InverseMass);
 				}
 
 				deltaQuaternion = math.cross(position.Value - m_Pose.Position, correction);
 			}
 
 			deltaQuaternion = m_Pose.InverseRotate(deltaQuaternion);
-			deltaQuaternion *= m_InverseInertiaTensor;
+			deltaQuaternion *= m_Collider.InverseInertiaTensor;
 			deltaQuaternion = m_Pose.Rotate(deltaQuaternion);
 
 			if (velocityLevel)
@@ -265,6 +258,39 @@ namespace XPBD
 			}
 		}
 
+		public float CalculateFirctionForceLimit(
+			float frictionMagnitude,
+			float3 contactNormal,
+			float3 contactPoint,
+            float3 deltaVDirection,
+			float deltaVMagnitude)
+		{
+			var beforePointV = GetVelocityAt(contactPoint);
+
+            // TODO refactor
+            var beforeVelocity = m_Velocity;
+            var beforeAngularVelocity = m_AngularVelocity;
+
+            var correctionAmount = deltaVDirection * frictionMagnitude;
+            ApplyCorrection(correctionAmount, contactPoint, true);
+
+            var afterPointV = GetVelocityAt(contactPoint);
+            var actualDeltaV = afterPointV - beforePointV;
+            var actualTangDeltaV = actualDeltaV - contactNormal * math.dot(actualDeltaV, contactNormal);
+            var actualTDVLenght = math.length(actualTangDeltaV);
+            
+            m_Velocity = beforeVelocity;
+            m_AngularVelocity = beforeAngularVelocity;
+            var reduction = actualTDVLenght == 0f ? 0f : math.clamp(deltaVMagnitude / actualTDVLenght, 0, 1);
+            return reduction * frictionMagnitude;
+		}
+
+		public void ApplyDrag(float deltaTime)
+		{
+			var drag = m_Velocity * m_Collider.Drag;
+			m_Velocity -= deltaTime * m_Collider.InverseMass * drag;
+		}
+
 		/// <summary>
 		/// </summary>
 		/// <param name="rotation">Angular speed</param>
@@ -287,13 +313,13 @@ namespace XPBD
 				y: rotation.y * scale,
 				z: rotation.z * scale,
 				w: 0.0f);
-			deltaQuaternion = math.mul(deltaQuaternion, m_Pose.Quaternion);
+			deltaQuaternion = math.mul(deltaQuaternion, m_Pose.Rotation);
 
 			var quaternion = new quaternion(
-				x: m_Pose.Quaternion.value.x + 0.5f * deltaQuaternion.value.x,
-				y: m_Pose.Quaternion.value.y + 0.5f * deltaQuaternion.value.y,
-				z: m_Pose.Quaternion.value.z + 0.5f * deltaQuaternion.value.z,
-				w: m_Pose.Quaternion.value.w + 0.5f * deltaQuaternion.value.w);
+				x: m_Pose.Rotation.value.x + 0.5f * deltaQuaternion.value.x,
+				y: m_Pose.Rotation.value.y + 0.5f * deltaQuaternion.value.y,
+				z: m_Pose.Rotation.value.z + 0.5f * deltaQuaternion.value.z,
+				w: m_Pose.Rotation.value.w + 0.5f * deltaQuaternion.value.w);
 			quaternion = math.normalize(quaternion);
 
 			m_Pose = m_Pose.SetRotation(quaternion);
