@@ -1,12 +1,14 @@
 using Unity.Mathematics;
+using UnityEngine;
 
 namespace XPBD
 {
-	public class FakeBody
+	public class FakeBody : IActor
 	{
 		private const float k_MaxRotationPerSubstep = 0.5f;
 
-		private readonly BaseFakeCollider m_Collider;
+		private readonly IFakeCollider m_Collider;
+		private readonly bool m_IsKinematic;
 
 		private FakePose m_Pose;
 		private FakePose m_PreviousPose;
@@ -14,49 +16,64 @@ namespace XPBD
 		private float3 m_Velocity;
 		private float3 m_AngularVelocity; // omega
 
-		public FakeBody(in FakePose pose, BaseFakeCollider collider)
+		private readonly float m_InverseMass;
+		private readonly float3 m_Drag;
+		private readonly float3 m_InverseInertiaTensor; // may just inverse inertia
+
+		public FakeBody(in FakePose pose, float mass, float3 drag, IFakeCollider collider) : this(mass, collider)
 		{
 			m_Pose = pose;
 			m_PreviousPose = pose;
+			m_IsKinematic = false;
+			m_Drag = drag;
+		}
+
+		public FakeBody(Transform transform)
+		{
+			m_Pose = new FakePose(transform.position, transform.rotation);
+		}
+
+		public FakeBody(Rigidbody rigidbody, IFakeCollider collider) : this(rigidbody.mass, collider)
+		{
+			m_Pose = new FakePose(rigidbody.position, rigidbody.rotation);
+			m_PreviousPose = m_Pose;
+			m_IsKinematic = rigidbody.isKinematic;
+			m_Drag = rigidbody.drag;
+		}
+
+		private FakeBody(float mass, IFakeCollider collider)
+		{
 			m_Velocity = float3.zero;
 			m_AngularVelocity = float3.zero;
 
 			m_Collider = collider;
+
+			m_InverseMass = math.isfinite(mass) switch
+			{
+				true => 1.0f / mass,
+				false => 0.0f,
+			};
+
+			m_InverseInertiaTensor = collider.CalculateInverseInertiaTensor(mass);
 		}
 
 		public FakePose Pose => m_Pose;
 
-		public BaseFakeCollider Collider => m_Collider;
+		public IFakeCollider Collider => m_Collider;
 
 		public float3 AngularVelocity => m_AngularVelocity;
 
-		// public void SetBox()
-		// {
-		// 	var boxCollider = GetComponent<BoxCollider>();
+		public bool IsKinematic => m_IsKinematic;
 
-		// 	Assert.IsNotNull(boxCollider);
+		public void UpdateWith(in FakePose pose)
+		{
+			m_Pose = pose;
+		}
 
-		// 	m_InverseMass = math.isfinite(m_Mass) switch
-		// 	{
-		// 		true => 1.0f / m_Mass,
-		// 		false => 0.0f,
-		// 	};
-
-		// 	var size = boxCollider.size;
-		// 	var inertiaTensor = new float3()
-		// 	{
-		// 		x = (m_Mass / 12.0f) * (size.y * size.y + size.z * size.z),
-		// 		y = (m_Mass / 12.0f) * (size.x * size.x + size.z * size.z),
-		// 		z = (m_Mass / 12.0f) * (size.x * size.x + size.y * size.y),
-		// 	};
-
-		// 	m_InverseInertiaTensor = new float3()
-		// 	{
-		// 		x = 1.0f / inertiaTensor.x,
-		// 		y = 1.0f / inertiaTensor.y,
-		// 		z = 1.0f / inertiaTensor.z,
-		// 	};
-		// }
+		public void UpdateWith(Rigidbody rigidbody)
+		{
+			m_Pose = new FakePose(rigidbody.position, rigidbody.rotation);
+		}
 
 		public void ApplyAcceleration(float deltaTime, float3 acceleration)
 		{
@@ -107,13 +124,13 @@ namespace XPBD
 			nVector = m_Pose.InverseRotate(nVector);
 
 			var w =
-				nVector.x * nVector.x * m_Collider.InverseInertiaTensor.x +
-				nVector.y * nVector.y * m_Collider.InverseInertiaTensor.y +
-				nVector.z * nVector.z * m_Collider.InverseInertiaTensor.z;
+				nVector.x * nVector.x * m_InverseInertiaTensor.x +
+				nVector.y * nVector.y * m_InverseInertiaTensor.y +
+				nVector.z * nVector.z * m_InverseInertiaTensor.z;
 
 			if (position != null)
 			{
-				w += m_Collider.InverseMass;
+				w += m_InverseMass;
 			}
 
 			return w;
@@ -130,18 +147,18 @@ namespace XPBD
 			{
 				if (velocityLevel)
 				{
-					m_Velocity += correction * m_Collider.InverseMass;
+					m_Velocity += correction * m_InverseMass;
 				}
 				else
 				{
-					m_Pose = m_Pose.Translate(correction * m_Collider.InverseMass);
+					m_Pose = m_Pose.Translate(correction * m_InverseMass);
 				}
 
 				deltaQuaternion = math.cross(position.Value - m_Pose.Position, correction);
 			}
 
 			deltaQuaternion = m_Pose.InverseRotate(deltaQuaternion);
-			deltaQuaternion *= m_Collider.InverseInertiaTensor;
+			deltaQuaternion *= m_InverseInertiaTensor;
 			deltaQuaternion = m_Pose.Rotate(deltaQuaternion);
 
 			if (velocityLevel)
@@ -171,6 +188,14 @@ namespace XPBD
 				return;
 			}
 
+			body0 = body0 == null ? null : body0.IsKinematic ? null : body0;
+			body1 = body1 == null ? null : body1.IsKinematic ? null : body1;
+
+			if (body0 == null && body1 == null)
+			{
+				return;
+			}
+
 			var normal = correction / correctionLength;
 
 			var w0 = body0 == null ? 0.0f : body0.GetInverseMass(normal, position0);
@@ -186,10 +211,7 @@ namespace XPBD
 			var lambda = -correctionLength / (w + compliance / (deltaTime * deltaTime));
 			normal *= -lambda;
 
-			if (body0 != null)
-			{
-				body0.ApplyCorrection(normal, position0, velocityLevel);
-			}
+			body0?.ApplyCorrection(normal, position0, velocityLevel);
 
 			if (body1 != null)
 			{
@@ -287,8 +309,8 @@ namespace XPBD
 
 		public void ApplyDrag(float deltaTime)
 		{
-			var drag = m_Velocity * m_Collider.Drag;
-			m_Velocity -= deltaTime * m_Collider.InverseMass * drag;
+			var drag = m_Velocity * m_Drag;
+			m_Velocity -= m_InverseMass * deltaTime * drag;
 		}
 
 		/// <summary>

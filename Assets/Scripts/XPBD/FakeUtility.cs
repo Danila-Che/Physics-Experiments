@@ -40,5 +40,21 @@ namespace XPBD
 				y: (-quaternion.value.x * w2) + quaternion.value.y * z2,
 				z: (quaternion.value.w * w2) - 1.0f + quaternion.value.z * z2);
 		}
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public static float3 CalculateCorrection(float3 from, float3 to, float distance)
+		{
+			var direction = to - from;
+			var length = math.length(direction);
+			var error = (length - distance) / length;
+
+			return error * direction;
+		}
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public static float3 CalculateCorrection(float3 from, float3 to)
+		{
+			return to - from;
+		}
 	}
 }

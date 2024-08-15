@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using Unity.Mathematics;
 using UnityEngine;
@@ -78,6 +79,11 @@ namespace XPBD
 		public FakePose SetRotation(quaternion rotation)
 		{
 			return new FakePose(m_Position, rotation);
+		}
+
+		public override string ToString()
+		{
+			return string.Format(CultureInfo.InvariantCulture.NumberFormat, "({0}, {1})", m_Position.ToString(), m_Rotation.ToString());
 		}
 	}
 }
