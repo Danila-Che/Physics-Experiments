@@ -6,10 +6,7 @@ namespace XPBD
 {
 	public class FakeSolver
 	{
-		private readonly float3 m_GravitationalAcceleration = Physics.gravity;
-		private readonly int m_SubstepIteractionsNumber = 1;
-		private readonly int m_SolvePositionIteractionsNumber = 1;
-		private readonly int m_SolverCollisionIteractionNumber = 1;
+		private readonly SolverArgs m_SolverArgs;
 
 		private readonly List<FakeBody> m_Bodies;
 		private readonly List<IActor> m_Actors;
@@ -19,17 +16,9 @@ namespace XPBD
 
 		private readonly FakeCollisionSystem m_FakeCollisionSystem;
 
-		public FakeSolver(
-			float3 gravitationalAcceleration,
-			int substepIteractionsNumber,
-			int solvePositionIteractionsNumber,
-			int solverCollisionIteractionNumber,
-			FakeCollisionSystem fakeCollisionSystem)
+		public FakeSolver(SolverArgs solverArgs, FakeCollisionSystem fakeCollisionSystem)
 		{
-			m_GravitationalAcceleration = gravitationalAcceleration;
-			m_SubstepIteractionsNumber = substepIteractionsNumber;
-			m_SolvePositionIteractionsNumber = solvePositionIteractionsNumber;
-			m_SolverCollisionIteractionNumber = solverCollisionIteractionNumber;
+			m_SolverArgs = solverArgs;
 
 			m_Bodies = new List<FakeBody>();
 			m_Actors = new List<IActor>();
@@ -113,9 +102,9 @@ namespace XPBD
 
 		public void Step(float deltaTime)
 		{
-			var substepDeltaTime = deltaTime / m_SubstepIteractionsNumber;
+			var substepDeltaTime = deltaTime / m_SolverArgs.SubstepIteractionsNumber;
 
-			for (int iteration = 0; iteration < m_SubstepIteractionsNumber; iteration++)
+			for (int iteration = 0; iteration < m_SolverArgs.SubstepIteractionsNumber; iteration++)
 			{
 				for (int i = 0; i < m_Bodies.Count; i++)
 				{
@@ -159,7 +148,7 @@ namespace XPBD
 
 					if (body.IsKinematic) { continue; }
 
-					body.ApplyAcceleration(substepDeltaTime, m_GravitationalAcceleration);
+					body.ApplyAcceleration(substepDeltaTime, m_SolverArgs.GravitationalAcceleration);
 					body.ApplyDrag(substepDeltaTime);
 					body.Step(substepDeltaTime);
 				}
@@ -168,7 +157,7 @@ namespace XPBD
 				{
 					var actor = m_Actors[i];
 
-					actor.ApplyAcceleration(substepDeltaTime, m_GravitationalAcceleration);
+					actor.ApplyAcceleration(substepDeltaTime, m_SolverArgs.GravitationalAcceleration);
 					actor.ApplyDrag(substepDeltaTime);
 					actor.Step(substepDeltaTime);
 				}
@@ -180,9 +169,14 @@ namespace XPBD
 					m_Joints[i].SolvePosition(substepDeltaTime);
 				}
 
-				for (int i = 0; i < m_Constrainables.Count; i++)
+				var constraintSubstepDeltaTime = deltaTime / m_SolverArgs.SolvePositionIteractionsNumber;
+
+				for (int constraintIteration = 0; constraintIteration < m_SolverArgs.SolvePositionIteractionsNumber; constraintIteration++)
 				{
-					m_Constrainables[i].SolveConstraints(substepDeltaTime);
+					for (int i = 0; i < m_Constrainables.Count; i++)
+					{
+						m_Constrainables[i].SolveConstraints(constraintSubstepDeltaTime);
+					}
 				}
 
 				m_FakeCollisionSystem.SolveCollision(m_Bodies, substepDeltaTime);

@@ -1,85 +1,92 @@
+using Unity.Mathematics;
 using UnityEngine;
 
 namespace CustomCollisionDetection
 {
-    [RequireComponent(typeof(BoxCollider))]
     [RequireComponent(typeof(Rigidbody))]
+    [RequireComponent(typeof(BoxCollider))]
 	public class CustomBoxCollider : MonoBehaviour
     {
-        private BoxCollider m_BoxCollider;
-        private Rigidbody m_Rigidbody;
-		private Vector3 m_Velocity;
+        private const int k_BoxVerticesCount = 8;
 
-        public void Init()
+        private Rigidbody m_Rigidbody;
+        private BoxCollider m_BoxCollider;
+        private float3 m_HalfSize;
+		private float3[] m_Vertices;
+        private float3[] m_WorldVertices;
+
+		private float3 m_Position;
+		private quaternion m_Rotation;
+		private Bounds m_Bounds;
+
+        public float3 Position => m_Rigidbody.position;
+
+		public float3[] WorldVertices => m_WorldVertices;
+
+		public Bounds Bounds => m_Bounds;
+
+		public bool IsIntersects { get; set; } = false;
+
+        public bool IsCollide { get; set; } = false;
+
+		public void Init()
         {
             m_BoxCollider = GetComponent<BoxCollider>();
             m_Rigidbody = GetComponent<Rigidbody>();
 
             m_Rigidbody.useGravity = false;
             m_Rigidbody.isKinematic = true;
+            m_BoxCollider.isTrigger = true;
 
-			m_Velocity = Vector3.zero;
+            m_HalfSize = 0.5f * m_BoxCollider.size;
+
+            m_Vertices = new float3[k_BoxVerticesCount];
+            m_WorldVertices = new float3[k_BoxVerticesCount];
+
+			m_Vertices[0] = new float3(-m_HalfSize.x, -m_HalfSize.y, -m_HalfSize.z);
+			m_Vertices[1] = new float3(-m_HalfSize.x, -m_HalfSize.y, m_HalfSize.z);
+			m_Vertices[2] = new float3(-m_HalfSize.x, m_HalfSize.y, -m_HalfSize.z);
+			m_Vertices[3] = new float3(-m_HalfSize.x, m_HalfSize.y, m_HalfSize.z);
+			m_Vertices[4] = new float3(m_HalfSize.x, -m_HalfSize.y, -m_HalfSize.z);
+			m_Vertices[5] = new float3(m_HalfSize.x, -m_HalfSize.y, m_HalfSize.z);
+			m_Vertices[6] = new float3(m_HalfSize.x, m_HalfSize.y, -m_HalfSize.z);
+			m_Vertices[7] = new float3(m_HalfSize.x, m_HalfSize.y, m_HalfSize.z);
 		}
 
-        public void ResolveAsseleration(Vector3 acceleration, float deltaTime)
-        {
-            m_Velocity += acceleration * deltaTime;
-            transform.position += m_Velocity * deltaTime;
+		public void OnBeginStep()
+		{
+			m_Position = (float3)m_Rigidbody.position;
+			m_Rotation = (quaternion)m_Rigidbody.rotation;
+			m_Bounds = m_BoxCollider.bounds;
+
+			UpdateVertices();
 		}
 
-        public void ResolveCollision(int maxCollisionCount)
+		public float3 FindFurthestPoint(float3 direction)
         {
-            var colliderHitBuffer = new Collider[maxCollisionCount];
-            var position = transform.position;
-            var rotation = transform.rotation;
+			var result = m_WorldVertices[0];
+			var maxDistance = math.dot(result, direction);
 
-            var collidersCount = Physics.OverlapBoxNonAlloc(
-				position,
-                m_BoxCollider.size / 2,
-				colliderHitBuffer,
-				rotation);
+			for (int i = 1; i < m_WorldVertices.Length; i++)
+			{
+				var distance = math.dot(m_WorldVertices[i], direction);
 
-            var impulse = Vector3.zero;
-
-            if (collidersCount > 1)
-            {
-                m_Velocity = Vector3.zero;
-            }
-
-            for (int i = 0; i < collidersCount; i++)
-            {
-                if (colliderHitBuffer[i] == m_BoxCollider)
-                {
-                    continue;
-                }
-
-				var colliderPosition = colliderHitBuffer[i].transform.position;
-				var colliderRotation = colliderHitBuffer[i].transform.rotation;
-
-				Physics.ComputePenetration(
-					m_BoxCollider,
-					position,
-					rotation,
-					colliderHitBuffer[i],
-                    colliderPosition,
-                    colliderRotation,
-					out Vector3 direction,
-					out float distance);
-
-                Debug.DrawRay(position, direction, Color.green);
-
-                impulse += distance * direction;
-				transform.position += distance * direction;
+				if (distance > maxDistance)
+				{
+					maxDistance = distance;
+					result = m_WorldVertices[i];
+				}
 			}
 
-            impulse /= collidersCount;
+			return result;
+		}
 
-			//transform.position += impulse;
-
-			//if (impulse != Vector3.zero)
-			//{
-			//	transform.rotation = Quaternion.LookRotation(impulse.normalized);
-			//}
+        private void UpdateVertices()
+        {
+			for (int i = 0; i < k_BoxVerticesCount; i++)
+			{
+				m_WorldVertices[i] = m_Position + math.mul(m_Rotation, m_Vertices[i]);
+			}
 		}
     }
 }

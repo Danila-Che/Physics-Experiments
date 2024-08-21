@@ -3,7 +3,7 @@ using Unity.Mathematics;
 
 namespace XPBD
 {
-	internal static class FakeUtility
+	internal static class FakeUtilities
 	{
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static float3 GetAxis0(quaternion quaternion)

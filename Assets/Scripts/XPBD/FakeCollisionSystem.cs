@@ -43,8 +43,6 @@ namespace XPBD
 				throw new ObjectDisposedException(GetType().Name);
 			}
 
-			Debug.Log($"> {bodies.Count} {deltaTime}");
-
 			for (int i = 0; i < bodies.Count - 1; i++)
 			{
 				var body0 = bodies[i];

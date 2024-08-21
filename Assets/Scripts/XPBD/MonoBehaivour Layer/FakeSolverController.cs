@@ -15,44 +15,40 @@ namespace FakeXPBDMonoBehaviour
 	[DefaultExecutionOrder((int)ExecutionOrder.Solver)]
     public class FakeSolverController : MonoBehaviour
     {
-		[SerializeField] private float3 m_GravitationalAcceleration = Physics.gravity;
-		[Min(1)]
-		[SerializeField] private int m_SubstepIteractionsNumber = 1;
-		[Min(1)]
-		[SerializeField] private int m_SolvePositionIteractionsNumber = 1;
-		[Min(1)]
-		[SerializeField] private int m_SolverCollisionIteractionNumber = 1;
+		[SerializeField] private SolverArgs m_SolverArgs;
 
-		private FakeCollisionSystem m_FakeCollisionSystem;
+		private FakeCollisionSystem m_CollisionSystem;
 		private FakeSolver m_Solver;
 
 		private void OnEnable()
 		{
-			m_FakeCollisionSystem = new FakeCollisionSystem();
+			m_CollisionSystem = new FakeCollisionSystem();
 
-			m_Solver = new FakeSolver(
-				m_GravitationalAcceleration,
-				m_SubstepIteractionsNumber,
-				m_SolvePositionIteractionsNumber,
-				m_SolverCollisionIteractionNumber,
-				m_FakeCollisionSystem);
+			//m_Solver = new FakeSolver(
+			//	m_GravitationalAcceleration,
+			//	m_SubstepIteractionsNumber,
+			//	m_SolvePositionIteractionsNumber,
+			//	m_SolverCollisionIteractionNumber,
+			//	m_FakeCollisionSystem);
+
+			m_Solver = new FakeSolver(m_SolverArgs, m_CollisionSystem);
 		}
 
 		private void OnDisable()
 		{
-			m_FakeCollisionSystem?.Dispose();
-			m_FakeCollisionSystem = null;
+			m_CollisionSystem?.Dispose();
+			m_CollisionSystem = null;
 		}
 
 #if UNITY_EDITOR
 
 		private void OnDrawGizmos()
 		{
-			if (m_FakeCollisionSystem == null) { return; }
+			if (m_CollisionSystem == null) { return; }
 
-			for (int i = 0; i < m_FakeCollisionSystem.Contacts.Count; i++)
+			for (int i = 0; i < m_CollisionSystem.Contacts.Count; i++)
 			{
-				var contact = m_FakeCollisionSystem.Contacts[i];
+				var contact = m_CollisionSystem.Contacts[i];
 
 				Gizmos.color = Color.green;
 				Gizmos.DrawSphere(contact.Point, 0.1f);

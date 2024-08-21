@@ -70,17 +70,17 @@ namespace XPBD
 			if (m_Params.Type == FakeJointType.Hinge)
 			{
 				// align axes
-				var a0 = FakeUtility.GetAxis0(m_GlobalPose0.Rotation);
-				var a1 = FakeUtility.GetAxis0(m_GlobalPose1.Rotation);
+				var a0 = FakeUtilities.GetAxis0(m_GlobalPose0.Rotation);
+				var a1 = FakeUtilities.GetAxis0(m_GlobalPose1.Rotation);
 				FakeBody.ApplyBodyPairCorrection(m_Body0, m_Body1, math.cross(a0, a1), 0f, deltaTime);
 
 				// limits
 				if (m_Params.HasSwingLimits)
 				{
 					UpdateGlobalPoses();
-					var n = FakeUtility.GetAxis0(m_GlobalPose0.Rotation);
-					var b0 = FakeUtility.GetAxis1(m_GlobalPose0.Rotation);
-					var b1 = FakeUtility.GetAxis1(m_GlobalPose1.Rotation);
+					var n = FakeUtilities.GetAxis0(m_GlobalPose0.Rotation);
+					var b0 = FakeUtilities.GetAxis1(m_GlobalPose0.Rotation);
+					var b1 = FakeUtilities.GetAxis1(m_GlobalPose1.Rotation);
 					FakeBody.LimitAngle(
 						m_Body0,
 						m_Body1,
@@ -100,8 +100,8 @@ namespace XPBD
 				if (m_Params.HasSwingLimits)
 				{
 					UpdateGlobalPoses();
-					var a0 = FakeUtility.GetAxis0(m_GlobalPose0.Rotation);
-					var a1 = FakeUtility.GetAxis0(m_GlobalPose1.Rotation);
+					var a0 = FakeUtilities.GetAxis0(m_GlobalPose0.Rotation);
+					var a1 = FakeUtilities.GetAxis0(m_GlobalPose1.Rotation);
 					var n = math.normalize(math.cross(a0, a1));
 					FakeBody.LimitAngle(
 						m_Body0,
@@ -119,14 +119,14 @@ namespace XPBD
 				if (m_Params.HasTwistLimits)
 				{
 					UpdateGlobalPoses();
-					var n0 = FakeUtility.GetAxis0(m_GlobalPose0.Rotation);
-					var n1 = FakeUtility.GetAxis0(m_GlobalPose1.Rotation);
+					var n0 = FakeUtilities.GetAxis0(m_GlobalPose0.Rotation);
+					var n1 = FakeUtilities.GetAxis0(m_GlobalPose1.Rotation);
 
 					var n = math.normalize(n0 + n1);
-					var a0 = FakeUtility.GetAxis1(m_GlobalPose0.Rotation);
+					var a0 = FakeUtilities.GetAxis1(m_GlobalPose0.Rotation);
 					a0 = math.normalize(a0 - n * math.dot(n, a0));
 
-					var a1 = FakeUtility.GetAxis1(m_GlobalPose1.Rotation);
+					var a1 = FakeUtilities.GetAxis1(m_GlobalPose1.Rotation);
 					a1 = math.normalize(a1 - n * math.dot(n, a1));
 
 					// handling gimbal lock problem

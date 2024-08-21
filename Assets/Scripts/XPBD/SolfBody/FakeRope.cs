@@ -202,7 +202,7 @@ namespace XPBD.SoftBody
 		{
 			var particle = m_Particles[particleIndex];
 
-			var correction = FakeUtility.CalculateCorrection(globalPosition, particle.Position);
+			var correction = FakeUtilities.CalculateCorrection(globalPosition, particle.Position);
 
 			//if (math.lengthsq(correction) < math.EPSILON)
 			//{
