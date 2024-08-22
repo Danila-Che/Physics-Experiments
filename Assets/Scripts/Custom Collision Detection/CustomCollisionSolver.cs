@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace CustomCollisionDetection
 {
-	public class CustomCollisionSolver : MonoBehaviour
+	internal class CustomCollisionSolver : MonoBehaviour
 	{
 		private struct Intersection
 		{
@@ -13,15 +13,18 @@ namespace CustomCollisionDetection
 			public CustomBoxCollider OtherCollider;
 		}
 
-		private struct Contact
+		private struct RawContact
 		{
 			public float3 Point;
+			public float angle;
 		}
 
 		private CustomBoxCollider[] m_Colliders;
 
 		private readonly List<Intersection> m_Intersections = new();
-		private readonly List<Contact> m_Contacts = new();
+		private readonly List<CollisionPoints> m_Contacts = new();
+
+		private readonly CollisionSystem m_CollisionSystem = new();
 
 		private void OnEnable()
 		{
@@ -71,6 +74,17 @@ namespace CustomCollisionDetection
 					Gizmos.DrawSphere(points[i], 0.05f);
 				}
 			}
+
+			Gizmos.color = Color.blue;
+
+			foreach (var contact in m_Contacts)
+			{
+				foreach (var point in contact.Points)
+				{
+					Gizmos.DrawSphere(point, 0.1f);
+					Gizmos.DrawRay(point, contact.Normal);
+				}
+			}
 		}
 
 #endif
@@ -112,10 +126,13 @@ namespace CustomCollisionDetection
 				var collider = m_Intersections[i].Collider;
 				var otherCollider = m_Intersections[i].OtherCollider;
 
-				var isCollide = IsCollide(collider, otherCollider);
+				if (TryGetCollisionPoints(collider, otherCollider, out var collisionPoints))
+				{
+					m_Contacts.Add(collisionPoints);
 
-				collider.IsCollide |= isCollide;
-				otherCollider.IsCollide |= isCollide;
+					collider.IsCollide = true;
+					otherCollider.IsCollide = true;
+				}
 			}
 		}
 
@@ -149,6 +166,256 @@ namespace CustomCollisionDetection
 			}
 		}
 
+		private bool TryGetCollisionPoints(CustomBoxCollider collider, CustomBoxCollider otherCollider, out CollisionPoints collisionPoints)
+		{
+			if (collider.TryCalculatePenetration(otherCollider, out collisionPoints))
+			{
+				m_CollisionSystem.CalculateContactPoints(collider, otherCollider, ref collisionPoints);
+
+				return true;
+			}
+
+			return false;
+		}
+
+		private void CalculateContactPoints(CustomBoxCollider collider, CustomBoxCollider otherCollider, ref CollisionPoints collisionPoints)
+		{
+			var contactPlane = new Plane(collisionPoints.Normal, collider.FindFurthestPoint(collisionPoints.Normal));
+
+			// World point and angle
+			var contactPointsA = new List<(float3, float)>(capacity: 4);
+			var contactPointsB = new List<(float3, float)>(capacity: 4);
+
+			FindContactPoints(collider, contactPlane, contactPointsA);
+			FindContactPoints(otherCollider, contactPlane, contactPointsB);
+
+			if (contactPointsA.Count == 0)
+			{
+				for (int i = 0; i < contactPointsB.Count; i++)
+				{
+					collisionPoints.Points.Add(contactPointsB[i].Item1);
+				}
+
+				return;
+			}
+
+			if (contactPointsB.Count == 0)
+			{
+				for (int i = 0; i < contactPointsA.Count; i++)
+				{
+					collisionPoints.Points.Add(contactPointsA[i].Item1);
+				}
+
+				return;
+			}
+
+			//Vertex to face contact
+			if (contactPointsA.Count == 1)
+			{
+				collisionPoints.Points.Add(contactPointsA[0].Item1);
+				return;
+			}
+			else if (contactPointsB.Count == 1)
+			{
+				collisionPoints.Points.Add(contactPointsB[0].Item1);
+				return;
+			}
+
+			CalculateAngles(contactPointsA, collisionPoints.Normal);
+			CalculateAngles(contactPointsB, collisionPoints.Normal);
+
+			contactPointsA.Sort(CompareAngle);
+			contactPointsB.Sort(CompareAngle);
+
+			var realContactPoints = new List<float3>();
+			CheckIntersection(contactPointsA, contactPointsB, collisionPoints.Normal, realContactPoints);
+
+			if (realContactPoints.Count == 0)
+			{
+				CheckIntersection(contactPointsB, contactPointsA, collisionPoints.Normal, realContactPoints);
+			}
+
+			collisionPoints.Points.AddRange(realContactPoints);
+		}
+
+		private void FindContactPoints(CustomBoxCollider collider, Plane plane, List<(float3, float)> contactBuffer)
+		{
+			for (int i = 0; i < collider.WorldVertices.Length; i++)
+			{
+				var worldPoint = collider.WorldVertices[i];
+				var distance = plane.GetDistanceToPoint(worldPoint);
+
+				if (distance > 0.005f) { continue; }
+
+				contactBuffer.Add((worldPoint, 0.0f));
+			}
+		}
+
+		private void CalculateAngles(List<(float3, float)> contactBuffer, float3 normal)
+		{
+			var origin = FindOrigin(contactBuffer);
+			var refVector = contactBuffer[0].Item1 - origin;
+
+			for (int i = 0; i < contactBuffer.Count; i++)
+			{
+				var originToPoint = contactBuffer[i].Item1 - origin;
+				var u = math.dot(normal, math.cross(refVector, originToPoint));
+				var angle = CollisionUtilities.AngleInDegrees(refVector, originToPoint);
+
+				var contact = contactBuffer[i];
+
+				if (u <= 0.001f)
+				{
+					contact.Item2 = angle;
+				}
+				else
+				{
+					contact.Item2 = angle + 180.0f;
+				}
+
+				contactBuffer[i] = contact;
+			}
+		}
+
+		private float3 FindOrigin(List<(float3, float)> contactBuffer)
+		{
+			var origin = float3.zero;
+
+			for (int i = 0; i < contactBuffer.Count; i++)
+			{
+				origin += contactBuffer[i].Item1;
+			}
+
+			origin /= contactBuffer.Count;
+			return origin;
+		}
+
+		private int CompareAngle((float3, float) contactA, (float3, float) contactB)
+		{
+			if (contactA.Item2 < contactB.Item2)
+			{
+				return -1;
+			}
+
+			return 1;
+		}
+
+		private void CheckIntersection(
+			List<(float3, float)> contactPointsA,
+			List<(float3, float)> contactPointsB,
+			float3 normal,
+			List<float3> contactPointsBuffer)
+		{
+			for (int it = 0; it < contactPointsB.Count; it++)
+			{
+				var itSecondP = it + 1;
+				if (itSecondP == contactPointsB.Count)
+				{
+					itSecondP = 0;
+				}
+
+				//We assume that the first point is inside
+				var passedCount = 1;
+
+				//Check if first point inside shape
+				for (int jt = 0; jt < contactPointsA.Count; jt++)
+				{
+					var jtSecondP = jt + 1;
+					if (jtSecondP == contactPointsA.Count)
+					{
+						jtSecondP = 0;
+					}
+
+					var vct = contactPointsB[it].Item1 - contactPointsA[jt].Item1;
+					var edgeVector = contactPointsA[jtSecondP].Item1 - contactPointsA[jt].Item1;
+
+					var norm = math.cross(math.normalize(edgeVector), normal);
+
+					if (math.dot(norm, vct) < 0)
+					{
+						passedCount--;
+						break;
+					}
+				}
+				if (passedCount == 1)
+				{
+					contactPointsBuffer.Add(contactPointsB[it].Item1);
+				}
+
+
+				//Check if second point inside shape
+				//We assume that the second point is inside
+				passedCount++;
+				for (int jt = 0; jt < contactPointsA.Count; jt++)
+				{
+					int jtSecondP = jt + 1;
+					if (jtSecondP == contactPointsA.Count)
+					{
+						jtSecondP = 0;
+					}
+
+					var vct = contactPointsB[itSecondP].Item1 - contactPointsA[jt].Item1;
+					var edgeVector = contactPointsA[jtSecondP].Item1 - contactPointsA[jt].Item1;
+
+					var norm = math.normalize(math.cross(math.normalize(edgeVector), normal));
+
+					if (math.dot(norm, vct) < 0)
+					{
+						passedCount--;
+						break;
+					}
+				}
+
+				//all points of current line is inside shape
+				if (passedCount == 2)
+				{
+					continue;
+				}
+
+				////all points of current line is outside shape
+				//if (passedCount == 0 && !(contactPointsA.size() == 2 && contactPointsB.size() == 2))
+				//    continue;
+
+				//Check if line separate shape
+				for (int jt = 0; jt < contactPointsA.Count; jt++)
+				{
+					int jtSecondP = jt + 1;
+					if (jtSecondP == contactPointsA.Count)
+					{
+						jtSecondP = 0;
+					}
+
+					bool notParallel = CollisionUtilities.ClosetPointBetweenAxis(
+						(contactPointsB[it].Item1, contactPointsB[itSecondP].Item1),
+						(contactPointsA[jt].Item1, contactPointsA[jtSecondP].Item1),
+						out float3 projectPoint);
+
+					if (!notParallel)
+					{
+						continue;
+					}
+
+					float vct1 = math.lengthsq(contactPointsB[it].Item1 - projectPoint);
+					float vct2 = math.lengthsq(contactPointsB[itSecondP].Item1 - projectPoint);
+
+					float lengthAxisB = math.lengthsq(contactPointsB[itSecondP].Item1 - contactPointsB[it].Item1);
+					float lengthAxisA = math.lengthsq(contactPointsA[jtSecondP].Item1 - contactPointsA[jt].Item1);
+
+					if (vct1 > lengthAxisA || vct2 > lengthAxisA)
+					{
+						continue;
+					}
+
+					if (vct1 > lengthAxisB || vct2 > lengthAxisB)
+					{
+						continue;
+					}
+
+					contactPointsBuffer.Add(projectPoint);
+				}
+			}
+		}
+
 		private float3 GetSupportPoint(CustomBoxCollider collider, CustomBoxCollider otherCollider, float3 direction)
 		{
 			var pointA = collider.FindFurthestPoint(direction);
@@ -166,106 +433,6 @@ namespace CustomCollisionDetection
 				4 => CollisionUtilities.CheckTetrahedron(ref simplex, ref direction),
 				_ => false,
 			};
-		}
-
-		private static bool ContainsOrigin(int length, float3[] simplex, ref float3 direction)
-		{
-			// Если симплекс состоит из одной точки, то он не может содержать начало координат
-			if (length == 1)
-			{
-				return false;
-			}
-
-			// Если симплекс состоит из двух точек (отрезок)
-			if (length == 2)
-			{
-				float3 A = simplex[1];
-				float3 B = simplex[0];
-				float3 AB = B - A;
-				float3 AO = -A;
-
-				// Направление перпендикулярно отрезку AB в сторону начала координат
-				direction = math.cross(math.cross(AB, AO), AB);
-				return false;
-			}
-
-			// Если симплекс состоит из трех точек (треугольник)
-			if (length == 3)
-			{
-				float3 A = simplex[2];
-				float3 B = simplex[1];
-				float3 C = simplex[0];
-				float3 AB = B - A;
-				float3 AC = C - A;
-				float3 AO = -A;
-
-				float3 ABC = math.cross(AB, AC);
-
-				// Проверка, находится ли начало координат в одной из сторон треугольника
-				if (math.dot(math.cross(ABC, AC), AO) > 0)
-				{
-					simplex[1] = simplex[0];
-					simplex[0] = A;
-					direction = math.cross(math.cross(AC, AO), AC);
-				}
-				else if (math.dot(math.cross(AB, ABC), AO) > 0)
-				{
-					simplex[0] = A;
-					direction = math.cross(math.cross(AB, AO), AB);
-				}
-				else
-				{
-					direction = ABC;
-				}
-				return false;
-			}
-
-			// Если симплекс состоит из четырех точек (тетраэдр)
-			if (length == 4)
-			{
-				float3 A = simplex[3];
-				float3 B = simplex[2];
-				float3 C = simplex[1];
-				float3 D = simplex[0];
-				float3 AB = B - A;
-				float3 AC = C - A;
-				float3 AD = D - A;
-				float3 AO = -A;
-
-				float3 ABC = math.cross(AB, AC);
-				float3 ACD = math.cross(AC, AD);
-				float3 ADB = math.cross(AD, AB);
-
-				// Проверка, находится ли начало координат в одной из сторон тетраэдра
-				if (math.dot(ABC, AO) > 0)
-				{
-					simplex[0] = simplex[1];
-					simplex[1] = simplex[2];
-					simplex[2] = simplex[3];
-					//simplex = simplex.Take(3).ToArray();
-					direction = ABC;
-				}
-				else if (math.dot(ACD, AO) > 0)
-				{
-					simplex[0] = simplex[1];
-					simplex[1] = simplex[3];
-					//simplex = simplex.Take(3).ToArray();
-					direction = ACD;
-				}
-				else if (math.dot(ADB, AO) > 0)
-				{
-					simplex[1] = simplex[2];
-					simplex[2] = simplex[3];
-					//simplex = simplex.Take(3).ToArray();
-					direction = ADB;
-				}
-				else
-				{
-					return true;
-				}
-			}
-
-			return false;
 		}
 	}
 }

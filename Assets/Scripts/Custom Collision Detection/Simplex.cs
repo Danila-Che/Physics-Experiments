@@ -2,7 +2,7 @@ using Unity.Mathematics;
 
 namespace CustomCollisionDetection
 {
-	public struct Simplex
+	internal struct Simplex
 	{
 		private readonly float3[] m_Points;
 		private int m_Size;

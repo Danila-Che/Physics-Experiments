@@ -6,7 +6,8 @@
         "UnityEditor.TestRunner",
         "CustomPhysics",
         "Unity.Mathematics",
-        "Unity.Collections"
+        "Unity.Collections",
+        "CustomCollisionDetection"
     ],
     "includePlatforms": [
         "Editor"

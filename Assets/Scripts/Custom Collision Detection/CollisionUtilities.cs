@@ -3,7 +3,7 @@ using Unity.Mathematics;
 
 namespace CustomCollisionDetection
 {
-	public class CollisionUtilities
+	internal class CollisionUtilities
 	{
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static bool CheckLine(ref Simplex points, ref float3 direction)
@@ -124,6 +124,44 @@ namespace CustomCollisionDetection
 		private static bool HasSameDirection(float3 direction, float3 ao)
 		{
 			return math.dot(direction, ao) > 0.0f;
+		}
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public static float AngleInDegrees(float3 from, float3 to)
+		{
+			var num = math.sqrt(math.lengthsq(from) * math.lengthsq(to));
+
+			if (num < 1E-15f)
+			{
+				return 0.0f;
+			}
+
+			var num2 = math.clamp(math.dot(from, to) / num, -1.0f, 1.0f);
+			return math.degrees(math.acos(num2));
+		}
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public static bool ClosetPointBetweenAxis((float3, float3) axis1, (float3, float3) axis2, out float3 projectPoint)
+		{
+			var axis1Vector = math.normalize(axis1.Item2 - axis1.Item1);
+			var axis2Vector = math.normalize(axis2.Item2 - axis2.Item1);
+
+			float normU = math.dot(axis1Vector, axis2Vector);
+
+			// Axes are parallel each others
+			if (math.abs(normU) == 1.0f)
+			{
+				projectPoint = float3.zero;
+				return false;
+			}
+
+			var cn = math.normalize(math.cross(axis2Vector, axis1Vector));
+			var projection = axis1Vector * math.dot(axis2.Item1 - axis1.Item1, axis1Vector);
+			var rejection = axis2.Item1 - axis1.Item1 - axis1Vector * math.dot(axis2.Item1 - axis1.Item1, axis1Vector) - cn * math.dot(axis2.Item1 - axis1.Item1, cn);
+			var closetApproach = axis2.Item1 - axis2Vector * math.length(rejection) / math.dot(axis2Vector, math.normalize(rejection));
+
+			projectPoint = closetApproach;
+			return true;
 		}
 	}
 }

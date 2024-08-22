@@ -38,7 +38,7 @@ namespace CustomCollisionDetection
             m_Rigidbody.isKinematic = true;
             m_BoxCollider.isTrigger = true;
 
-            m_HalfSize = 0.5f * m_BoxCollider.size;
+            m_HalfSize = 0.5f * (float3)m_BoxCollider.size * (float3)transform.localScale;
 
             m_Vertices = new float3[k_BoxVerticesCount];
             m_WorldVertices = new float3[k_BoxVerticesCount];
@@ -81,7 +81,30 @@ namespace CustomCollisionDetection
 			return result;
 		}
 
-        private void UpdateVertices()
+		public bool TryCalculatePenetration(CustomBoxCollider otherCollider, out CollisionPoints collisionPoints)
+		{
+			var hasPenetration = Physics.ComputePenetration(
+				m_BoxCollider,
+				m_Rigidbody.position,
+				m_Rigidbody.rotation,
+				otherCollider.m_BoxCollider,
+				otherCollider.m_Rigidbody.position,
+				otherCollider.m_Rigidbody.rotation,
+				out var direction,
+				out var distance);
+
+			if (hasPenetration)
+			{
+				collisionPoints = new CollisionPoints(-direction, distance);
+
+				return true;
+			}
+
+			collisionPoints = default;
+			return false;
+		}
+
+		private void UpdateVertices()
         {
 			for (int i = 0; i < k_BoxVerticesCount; i++)
 			{
