@@ -34,6 +34,8 @@ namespace CustomCollisionDetection
             m_BoxCollider = GetComponent<BoxCollider>();
             m_Rigidbody = GetComponent<Rigidbody>();
 
+			Debug.Log($"> {m_Rigidbody.inertiaTensor}");
+
             m_Rigidbody.useGravity = false;
             m_Rigidbody.isKinematic = true;
             m_BoxCollider.isTrigger = true;
